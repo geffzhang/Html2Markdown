@@ -1,6 +1,10 @@
-version: 1.0.{build}
+version: 3.2.1.{build}
 skip_tags: true
 configuration: Release
+init:
+- git config --global core.autocrlf true
+install:
+- ps: npm install -g markdownlint-cli
 build:
   publish_nuget: true
   verbosity: minimal
@@ -16,11 +20,26 @@ deploy:
     secure: mqfd5QXj3a2N+D2EP9avxupQJRBJFEKT9kjF7Tipl1OCkUvPBsKjfiZMQHpnwVKq
   on:
     branch: master
-install:
-  - choco install doxygen.portable
+build_script:
+  - cmd: >-
+      cd %BUILD_DIR%
+
+      markdownlint .
+
+      dotnet restore
+      
+      dotnet build
+
+      dotnet pack .\src\Html2Markdown\Html2Markdown.csproj -c %CONFIGURATION% /p:PackageVersion=%APPVEYOR_BUILD_VERSION%
+test_script:
+  - cmd: >-
+      dotnet test .\test\Html2Markdown.Test\Html2Markdown.Test.csproj --logger "trx;LogFileName=results.trx"
 after_test:
-  - ps: C:/ProgramData/chocolatey/lib/doxygen.portable/tools/doxygen.exe doxygen.config
   - ps: ./pushDocumentation.ps1 $env:APPVEYOR_BUILD_FOLDER $env:GithubEmail $env:GithubUsername $env:GithubPersonalAccessToken $env:appveyor_repo_branch
+on_finish:
+  - ps: ./uploadTestResults.ps1
+artifacts:
+- path: src\Html2Markdown\bin\Release\*.nupkg
 notifications:
   - provider: Slack
     auth_token:
